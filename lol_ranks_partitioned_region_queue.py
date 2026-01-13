@@ -1,10 +1,10 @@
-# daily_aggregation.py
+#Group By Region and Queue
 import sys
 import logging
 from pyspark.context import SparkContext
 from awsglue.context import GlueContext
 from awsglue.utils import getResolvedOptions
-from pyspark.sql.functions import col, sum as spark_sum, avg, substring
+from pyspark.sql.functions import col, sum as spark_sum, avg
 from awsglue.dynamicframe import DynamicFrame
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -15,49 +15,42 @@ def main():
     database = args['database']
     table = args['table']
     output_path = args['output_path']
-    
+
     logger.info(f"Database: {database}, Table: {table}, Output: {output_path}")
-    
+
     sc = SparkContext()
     glueContext = GlueContext(sc)
-    
-    # Leer desde Glue Catalog usando GlueContext
+
+    # Leer desde Glue Catalog
     dynamic_frame = glueContext.create_dynamic_frame.from_catalog(
         database=database,
         table_name=table
     )
-    
-    # Convertir a Spark DataFrame
+
     df = dynamic_frame.toDF()
     df.printSchema()
     logger.info(f"Registros leídos: {df.count()}")
-    
-    df = df.withColumn("fecha", substring(col("timestamp_origen"), 1, 10))
-    
-    daily_df = df.groupBy("fecha", "tipo") \
-        .agg(
-            spark_sum("valor").alias("valor_total"),
-            avg("porcentaje").alias("porcentaje_promedio")
-        ) \
-        .orderBy("fecha", "tipo")
-    
-    output_dynamic_frame = DynamicFrame.fromDF(daily_df, glueContext, "output")
-    
+
+    # Ajusta los nombres de columnas según cómo estén en tu tabla
+    agg_df = df.groupBy("Region", "Queue","SummonerName","Tier","Rank").orderBy("Region", "Queue")
+
+    output_dynamic_frame = DynamicFrame.fromDF(agg_df, glueContext, "output")
+
     logger.info(f"Registros agregados: {output_dynamic_frame.count()}")
-    
-    # Escribir usando GlueContext
+
+    # Escribir particionando por Region
     glueContext.write_dynamic_frame.from_options(
         frame=output_dynamic_frame,
         connection_type="s3",
         connection_options={
             "path": output_path,
-            "partitionKeys": ["fecha"]
+            "partitionKeys": ["Region","Queue"]
         },
         format="parquet",
         format_options={"compression": "snappy"}
     )
-    
-    logger.info(f"Completado. Registros: {daily_df.count()}")
+
+    logger.info(f"Completado. Registros: {agg_df.count()}")
 
 if __name__ == "__main__":
     main()
