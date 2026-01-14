@@ -9,7 +9,6 @@ def lambda_handler(event, context):
         data_json = json.loads(payload)
 
         region = data_json.get("Region", "unknown_region")
-        queue = data_json.get("Queue", "unknown_queue")
 
         # Volver a serializar el JSON (sin modificar el contenido)
         encoded_data = base64.b64encode(
@@ -23,7 +22,6 @@ def lambda_handler(event, context):
             "metadata": {
                 "partitionKeys": {
                     "Region": region,
-                    "Queue": queue
                 }
             }
         }

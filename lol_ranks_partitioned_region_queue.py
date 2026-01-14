@@ -32,7 +32,11 @@ def main():
     logger.info(f"Registros leídos: {df.count()}")
 
     # Ajusta los nombres de columnas según cómo estén en tu tabla
-    agg_df = df.groupBy("Region", "Queue","SummonerName","Tier","Rank").orderBy("Region", "Queue")
+    agg_df = df.groupBy("Region", "Queue","SummonerName","Tier","Rank") \
+        .agg(  spark_sum("Wins").alias("Total_Wins"),
+               spark_sum("Losses").alias("Total_Losses"),
+            ) \
+            .orderBy("Region", "Queue")
 
     output_dynamic_frame = DynamicFrame.fromDF(agg_df, glueContext, "output")
 

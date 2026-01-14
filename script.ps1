@@ -43,8 +43,8 @@ aws lambda update-function-code `
 
 $env:DATABASE = "players_lol_db"
 $env:TABLE = "players_master_or_higher"
-$env:DAILY_OUTPUT = "s3://$($env:BUCKET_NAME)/processed/regions/"
-$env:MONTHLY_OUTPUT = "s3://$($env:BUCKET_NAME)/processed/energy_consumption_monthly/"
+$env:DAILY_OUTPUT = "s3://$($env:BUCKET_NAME)/processed/regions_queue/"
+$env:MONTHLY_OUTPUT = "s3://$($env:BUCKET_NAME)/processed/regions_rank/"
 $env:LAMBDA_ARN = $(aws lambda get-function --function-name playersLol-firehose-lambda --query 'Configuration.FunctionArn' --output text)
 
 # JSON ExtendedS3DestinationConfiguration como here-string
@@ -52,7 +52,7 @@ $extendedS3 = @"
 {
   ""BucketARN"": ""arn:aws:s3:::$($env:BUCKET_NAME)"",
   ""RoleARN"": ""$($env:ROLE_ARN)"",
-  ""Prefix"": ""raw/players_master_or_higher/Region=!{partitionKeyFromLambda:Region}/Queue=!{partitionKeyFromLambda:Queue}/"",
+  ""Prefix"": ""raw/players_master_or_higher/Region=!{partitionKeyFromLambda:Region}/"",
   ""ErrorOutputPrefix"": ""errors/!{firehose:error-output-type}/"",
   ""BufferingHints"": {
     ""SizeInMBs"": 64,
@@ -131,7 +131,7 @@ aws glue create-crawler `
   
   Write-Output "--- GLUE ETL Uploading"
   aws s3 cp "lol_ranks_partitioned_region_queue.py" "s3://$($env:BUCKET_NAME)/scripts/"
-  #aws s3 cp "energy_aggregation_monthly.py" "s3://$($env:BUCKET_NAME)/scripts/"
+  aws s3 cp "lol_ranks_partitioned_region_tier.py" "s3://$($env:BUCKET_NAME)/scripts/"
 
 
   
@@ -139,25 +139,25 @@ Write-Output "--- GLUE ETL Creating Jobs"
 Start-Sleep -Milliseconds 500
 
 # Command JSON para Glue jobs
-<#
-$monthlyCommand = @"
+
+$RanksCommand = @"
 {
   ""Name"": ""glueetl"",
-  ""ScriptLocation"": ""s3://$($env:BUCKET_NAME)/scripts/energy_aggregation_monthly.py"",
+  ""ScriptLocation"": ""s3://$($env:BUCKET_NAME)/scripts/lol_ranks_partitioned_region_tier.py"",
   ""PythonVersion"": ""3""
 }
 "@
-$monthlyArgs = @"
+$RanksArgs = @"
 {
   ""--database"": ""$($env:DATABASE)"",
   ""--table"": ""$($env:TABLE)"",
-  ""--output_path"": ""s3://$($env:BUCKET_NAME)/processed/energy_consumption_monthly/"",
+  ""--output_path"": ""s3://$($env:BUCKET_NAME)/processed/regions_rank/"",
   ""--enable-continuous-cloudwatch-log"": ""true"",
   ""--spark-event-logs-path"": ""s3://$($env:BUCKET_NAME)/logs/""
 }
 "@
-#>
-$dailyCommand = @"
+
+$QueueCommand = @"
 {
   ""Name"": ""glueetl"",
   ""ScriptLocation"": ""s3://$($env:BUCKET_NAME)/scripts/lol_ranks_partitioned_region_queue.py"",
@@ -167,30 +167,30 @@ $dailyCommand = @"
 
 # Default arguments para Glue jobs
 
-$dailyArgs = @"
+$QueueArgs = @"
 {
   ""--database"": ""$($env:DATABASE)"",
   ""--table"": ""$($env:TABLE)"",
-  ""--output_path"": ""s3://$($env:BUCKET_NAME)/processed/regions/"",
+  ""--output_path"": ""s3://$($env:BUCKET_NAME)/processed/regions_queue/"",
   ""--enable-continuous-cloudwatch-log"": ""true"",
   ""--spark-event-logs-path"": ""s3://$($env:BUCKET_NAME)/logs/""
 }
 "@
-<#
+
 aws glue create-job `
-  --name "energy-monthly-aggregation" `
+  --name "lol_ranks_partitioned_region_tier" `
   --role $env:ROLE_ARN `
-  --command "$monthlyCommand" `
-  --default-arguments "$monthlyArgs" `
+  --command "$RanksCommand" `
+  --default-arguments "$RanksArgs" `
   --glue-version "4.0" `
   --number-of-workers 2 `
   --worker-type "G.1X"
-#>
+
 aws glue create-job `
   --name "lol_ranks_partitioned_region_queue" `
   --role $env:ROLE_ARN `
-  --command "$dailyCommand" `
-  --default-arguments "$dailyArgs" `
+  --command "$QueueCommand" `
+  --default-arguments "$QueueArgs" `
   --glue-version "4.0" `
   --number-of-workers 2 `
   --worker-type "G.1X"

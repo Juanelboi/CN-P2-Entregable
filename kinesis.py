@@ -16,16 +16,15 @@ def load_data(file_path):
         return json.load(f)
 
 def run_producer():
-    data_list = load_data(INPUT_FILE)
+    data_list = load_data("playerslol.json")
     records_sent = 0
     
     # El JSON tiene una estructura 'included' donde están los arrays de valores    
     logger.info(f"Iniciando transmisión al stream: {STREAM_NAME}...")
     
-    # Iteramos sobre los 3 tipos de demanda (Real, Programada, Prevista)
     for data in data_list:
         Nombre_invocador = data['SUMMONERNAME']
-        Nivel = data['TIER']
+        Rango = data['TIER']
         Division = data['RANK']
         Wins = data['WINS']
         Losses = data['LOSSES']
@@ -35,7 +34,7 @@ def run_producer():
         # Estructura del mensaje a enviar
         payload = {
             'SummonerName': Nombre_invocador,
-            'Tier': Nivel,
+            'Tier': Rango,
             'Rank': Division,
             'Wins': Wins,
             'Losses': Losses,
@@ -52,7 +51,7 @@ def run_producer():
         
         records_sent += 1
         logger.info(f"Registro enviado al shard {response['ShardId']} con SequenceNumber {response['SequenceNumber']}")
-        logger.info(f"Enviado [{Nombre_invocador}]: {Nivel} {Division} - Wins: {Wins}, Losses: {Losses}, Queue: {Cola}, Region: {Region}")
+        logger.info(f"Enviado [{Nombre_invocador}]: {Rango} {Division} - Wins: {Wins}, Losses: {Losses}, Queue: {Cola}, Region: {Region}")
         
         # Pequeña pausa para simular streaming y no saturar de golpe
         time.sleep(0.01) 
