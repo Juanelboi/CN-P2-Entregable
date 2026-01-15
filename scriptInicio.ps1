@@ -41,7 +41,8 @@ aws lambda update-function-code `
   --zip-file "fileb://firehose.zip"
 
 
-$env:DATABASE = "players_lol_db"
+$env:DATABASERAW = "players_lol_db_raw"
+$env:DATABASEPROCESSED = "players_lol_db_processed"
 $env:TABLE = "players_master_or_higher"
 $env:DAILY_OUTPUT = "s3://$($env:BUCKET_NAME)/processed/regions_queue/"
 $env:MONTHLY_OUTPUT = "s3://$($env:BUCKET_NAME)/processed/regions_rank/"
@@ -52,7 +53,7 @@ $extendedS3 = @"
 {
   ""BucketARN"": ""arn:aws:s3:::$($env:BUCKET_NAME)"",
   ""RoleARN"": ""$($env:ROLE_ARN)"",
-  ""Prefix"": ""raw/players_master_or_higher/Region=!{partitionKeyFromLambda:Region}/"",
+  ""Prefix"": ""raw/players_master_or_higher/ProcessingDate=!{partitionKeyFromLambda:ProcessingDate}/"",
   ""ErrorOutputPrefix"": ""errors/!{firehose:error-output-type}/"",
   ""BufferingHints"": {
     ""SizeInMBs"": 64,
@@ -100,14 +101,14 @@ aws firehose create-delivery-stream `
   
   # Database
 
-$databaseInput = @"
+$databaseInputRaw = @"
 {
-  ""Name"": ""$($env:DATABASE)""
+  ""Name"": ""$($env:DATABASERAW)""
 }
 "@
 
 aws glue create-database `
-  --database-input "$databaseInput"
+  --database-input "$databaseInputRaw"
 
 $targetsglue = @"
 {
@@ -118,11 +119,38 @@ $targetsglue = @"
   ]
 }
 "@
+
 aws glue create-crawler `
   --name "playersLol-raw-crawler" `
   --role $env:ROLE_ARN `
-  --database-name $env:DATABASE `
+  --database-name $env:DATABASERAW `
   --targets "$targetsglue"
+  
+$databaseInputProcessed = @"
+{
+  ""Name"": ""$($env:DATABASEPROCESSED)""
+}
+"@
+
+aws glue create-database `
+  --database-input "$databaseInputProcessed"
+
+$targetsglue = @"
+{
+  ""S3Targets"": [
+    {
+      ""Path"": ""s3://$($env:BUCKET_NAME)/processed/""
+    }
+  ]
+}
+"@
+
+aws glue create-crawler `
+  --name "playersLol-processed-crawler" `
+  --role $env:ROLE_ARN `
+  --database-name $env:DATABASEPROCESSED `
+  --targets "$targetsglue"
+
 
   
   
@@ -149,7 +177,7 @@ $RanksCommand = @"
 "@
 $RanksArgs = @"
 {
-  ""--database"": ""$($env:DATABASE)"",
+  ""--database"": ""$($env:DATABASERAW)"",
   ""--table"": ""$($env:TABLE)"",
   ""--output_path"": ""s3://$($env:BUCKET_NAME)/processed/regions_rank/"",
   ""--enable-continuous-cloudwatch-log"": ""true"",
@@ -169,7 +197,7 @@ $QueueCommand = @"
 
 $QueueArgs = @"
 {
-  ""--database"": ""$($env:DATABASE)"",
+  ""--database"": ""$($env:DATABASERAW)"",
   ""--table"": ""$($env:TABLE)"",
   ""--output_path"": ""s3://$($env:BUCKET_NAME)/processed/regions_queue/"",
   ""--enable-continuous-cloudwatch-log"": ""true"",
@@ -194,22 +222,3 @@ aws glue create-job `
   --glue-version "4.0" `
   --number-of-workers 2 `
   --worker-type "G.1X"
-
-Write-Output "--- Jobs starting"
-
-<#Set-Location $ProjectRoot
-if (Test-Path ".venv\Scripts\python.exe") {
-    & .venv\Scripts\python.exe src\kinesis.py
-} else {
-    & python src\kinesis.py
-}
-Start-Sleep -Seconds 90
-Write-Output "--- Crawler & Jobs Execution"
-
-aws glue start-crawler --name "playersLol-raw-crawler"
-Start-Sleep -Seconds 150
-
-aws glue start-job-run --job-name "lol_ranks_partitioned_region_queue"
-
-aws glue get-job-runs --job-name "lol_ranks_partitioned_region_queue" --max-items 1
-#>

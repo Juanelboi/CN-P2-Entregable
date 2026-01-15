@@ -31,8 +31,8 @@ def main():
     df.printSchema()
     logger.info(f"Registros leídos: {df.count()}")
 
-    # Ajusta los nombres de columnas según cómo estén en tu tabla
-    agg_df = df.groupBy("Region", "Queue","SummonerName","Tier","Rank") \
+    #Organiza los datos por Region y Tier y las suma de Wins y Losses
+    agg_df = df.groupBy("Region","Tier") \
         .agg(  spark_sum("Wins").alias("Total_Wins"),
                spark_sum("Losses").alias("Total_Losses"),
             ) \
@@ -42,7 +42,7 @@ def main():
 
     logger.info(f"Registros agregados: {output_dynamic_frame.count()}")
 
-    # Escribir particionando por Region
+    #Envia los datos particionados por Region y Tier
     glueContext.write_dynamic_frame.from_options(
         frame=output_dynamic_frame,
         connection_type="s3",

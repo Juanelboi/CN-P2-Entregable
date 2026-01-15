@@ -1,3 +1,4 @@
+import datetime
 import json
 import base64
 
@@ -8,8 +9,12 @@ def lambda_handler(event, context):
         payload = base64.b64decode(record["data"]).decode("utf-8")
         data_json = json.loads(payload)
 
-        region = data_json.get("Region", "unknown_region")
-
+        # Add processing timestamp
+        processing_time = datetime.datetime.now(datetime.timezone.utc)
+        
+        # Create the partition key (YYYY-MM-DD format)
+        partition_date = processing_time.strftime('%Y-%m-%d')
+        
         # Volver a serializar el JSON (sin modificar el contenido)
         encoded_data = base64.b64encode(
             (json.dumps(data_json) + "\n").encode("utf-8")
@@ -21,7 +26,7 @@ def lambda_handler(event, context):
             "data": encoded_data,
             "metadata": {
                 "partitionKeys": {
-                    "Region": region,
+                    "ProcessingDate": partition_date
                 }
             }
         }

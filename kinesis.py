@@ -19,7 +19,6 @@ def run_producer():
     data_list = load_data("playerslol.json")
     records_sent = 0
     
-    # El JSON tiene una estructura 'included' donde están los arrays de valores    
     logger.info(f"Iniciando transmisión al stream: {STREAM_NAME}...")
     
     for data in data_list:
@@ -46,12 +45,13 @@ def run_producer():
         response = kinesis.put_record(
             StreamName=STREAM_NAME,
             Data=json.dumps(payload),
-            PartitionKey=Region # Usamos el tipo como clave de partición
+            PartitionKey=Nom # Usamos el tipo como clave de partición
         )
         
         records_sent += 1
-        logger.info(f"Registro enviado al shard {response['ShardId']} con SequenceNumber {response['SequenceNumber']}")
-        logger.info(f"Enviado [{Nombre_invocador}]: {Rango} {Division} - Wins: {Wins}, Losses: {Losses}, Queue: {Cola}, Region: {Region}")
+        if records_sent % 100 == 0:
+            logger.info(f"Registro enviado al shard {response['ShardId']} con SequenceNumber {response['SequenceNumber']}")
+            logger.info(f"Enviado [{Nombre_invocador}]: {Rango} {Division} - Wins: {Wins}, Losses: {Losses}, Queue: {Cola}, Region: {Region}")
         
         # Pequeña pausa para simular streaming y no saturar de golpe
         time.sleep(0.01) 
