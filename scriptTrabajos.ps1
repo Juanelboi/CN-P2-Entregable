@@ -1,7 +1,9 @@
 $env:ACCOUNT_ID = $(aws sts get-caller-identity --query Account --output text)
 $env:BUCKET_NAME = "datalake-jugadores-master-$($env:ACCOUNT_ID)"
 $env:DATABASEPROCESSED = "players_lol_db_processed"
-
+$env:ACCOUNT_ID = $(aws sts get-caller-identity --query Account --output text)
+$env:BUCKET_NAME = "datalake-jugadores-master-$($env:ACCOUNT_ID)"
+$env:DATABASEPROCESSED = "players_lol_db_processed"
 
 Write-Output "--- Crawler & Jobs Execution"
 
@@ -24,7 +26,6 @@ aws glue start-crawler --name "playersLol-processed-crawler"
 Write-Output "--- Crawler processed started"
 Start-Sleep -Seconds 120
 Write-Output "--- Crawler processed finished"
-
 
 Write-Output "Athenna Querys Execution"
 aws athena start-query-execution `

@@ -126,6 +126,7 @@ aws glue create-crawler `
   --database-name $env:DATABASERAW `
   --targets "$targetsglue"
   
+$env:DATABASEPROCESSED = "players_lol_db_processed"
 $databaseInputProcessed = @"
 {
   ""Name"": ""$($env:DATABASEPROCESSED)""
